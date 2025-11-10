@@ -9,9 +9,11 @@ interface SocketProviderProps {
 interface IsocketContext{
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     sendMessage:(message:string)=>any;
+    message:string[];
 }
 
-const SocketContext = React.createContext<IsocketContext['sendMessage'] | null>(null);
+const SocketContext = React.createContext<IsocketContext | null>(null);
+
 
 export const useSocket = () => {
     const context = React.useContext(SocketContext);
@@ -23,6 +25,7 @@ export const useSocket = () => {
 
 export const SocketProvider:React.FC<SocketProviderProps>=({children})=>{
     const [socket, setSocket] = React.useState<Socket | null>(null);
+    const[message,setMessage]=React.useState<string[]>([]);
     const sendMessage:IsocketContext['sendMessage']= React.useCallback((message:string)=>{
         console.log("Sending message:", message);
         if(socket){
@@ -30,10 +33,12 @@ export const SocketProvider:React.FC<SocketProviderProps>=({children})=>{
         }
     },[socket]);
 
-  const onmessageReceived=React.useCallback((message:string)=>{
-        console.log("Message received from server:", message);
-    },[]);
-    
+  const onmessageReceived = React.useCallback((raw: string) => {
+        console.log("Message received from server:", raw);
+        const { message: parsedMessage } = JSON.parse(raw) as { message: string };
+       setMessage((prevMessages) => [...prevMessages, parsedMessage]);
+    }, []);
+
     React.useEffect(() => {
         const socket = io("http://localhost:3000");
         socket.on("event:message", onmessageReceived);
@@ -45,7 +50,7 @@ export const SocketProvider:React.FC<SocketProviderProps>=({children})=>{
         };
     }, []);
     return(
-        <SocketContext.Provider value={sendMessage}>
+        <SocketContext.Provider value={{ sendMessage, message }}>
             {children}
         </SocketContext.Provider>
     )

@@ -4,14 +4,12 @@ import React from "react";
 import { useSocket } from "../context/Socketcontext";
 
 export default function Home() {
-  const sendMessage = useSocket();
+  const { sendMessage } = useSocket();
   const [message, setMessage] = React.useState("");
+  const [messages, setMessages] = React.useState<string[]>([]);
 
   return (
     <div>
-      <div>
-        <h1>all</h1>
-      </div>
       <div>
         <input
           className={classes["chat-input"]}
@@ -24,12 +22,18 @@ export default function Home() {
           onClick={() => {
             if (message.trim()) {
               sendMessage(message);
+              setMessages((prev) => [...prev, message]);
               setMessage("");
             }
           }}
         >
-          Send
+        Send
         </button>
+        <div>
+          {messages.map((e, idx) => (
+            <p key={idx}>{e}</p>
+          ))}
+        </div>
       </div>
     </div>
   );

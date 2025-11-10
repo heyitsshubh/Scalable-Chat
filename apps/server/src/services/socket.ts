@@ -1,15 +1,19 @@
+// ...existing code...
 import { Server } from "socket.io";
 import Redis from "ioredis";
 
-const pub= new Redis({
-    host: "127.0.0.1",
-  port: 6379
+// Use local Redis by default (no .env required). If you later want to override,
+// set process.env.REDIS_URL or process.env.SOCKET_PORT — but defaults work without an .env.
+const REDIS_HOST = "127.0.0.1";
+const REDIS_PORT = 6379;
+const SOCKET_PORT = 3000;
 
-});
-const sub= new Redis({
-   host: "127.0.0.1",
-  port: 6379
-});
+const pub = new Redis({ host: REDIS_HOST, port: REDIS_PORT });
+const sub = new Redis({ host: REDIS_HOST, port: REDIS_PORT });
+
+// prevent unhandled ioredis errors from crashing the process
+pub.on("error", (err) => console.error("[ioredis pub] error:", err));
+sub.on("error", (err) => console.error("[ioredis sub] error:", err));
 
 class SocketService {
     private _io: Server | null = null;
@@ -17,11 +21,27 @@ class SocketService {
       console.log("SocketService initialized");
       this._io = new Server({
         cors: {
-        allowedHeaders: ["*"],
+          allowedHeaders: ["*"],
           origin: "*",
         },
       });
-         sub.subscribe("messages");
+
+      // start listening on a port different from Next.js (default 3000)
+      try {
+        this._io.listen(SOCKET_PORT);
+        console.log(`Socket.io listening on port ${SOCKET_PORT}`);
+      } catch (err) {
+        console.error(`Failed to listen on port ${SOCKET_PORT}:`, err);
+        // rethrow so caller can handle; avoids leaving service in inconsistent state
+        throw err;
+      }
+
+      // subscribe to Redis channel; handle failures
+      sub.subscribe("messages").then(() => {
+        console.log("Subscribed to Redis 'messages' channel");
+      }).catch((err) => {
+        console.error("Redis subscribe failed:", err);
+      });
     }
 
     public initlisteners() {
@@ -34,25 +54,30 @@ class SocketService {
         io.on("connection", (socket) => {
             console.log(`New client connected: ${socket.id}`);
             socket.on("event:message", async (data) => {
-                console.log(`Message received: ${data}`);
-               await pub.publish("messages", JSON.stringify({ message: data }));
-
+                console.log(`Message received from client: ${data}`);
+                try {
+                    await pub.publish("messages", JSON.stringify({ message: data }));
+                } catch (err) {
+                    console.error("Failed to publish message to Redis:", err);
+                }
             });
         });
 
         sub.on("message", (channel, message) => {
             if (channel === "messages") {
-                const parsedMessage = JSON.parse(message);
-                console.log(`Broadcasting message: ${parsedMessage.message}`);
-                io.emit("event:message", parsedMessage.message);
+                try {
+                    const parsedMessage = JSON.parse(message);
+                    console.log(`Broadcasting message: ${parsedMessage.message}`);
+                    io.emit("event:message", parsedMessage.message);
+                } catch (err) {
+                    console.warn("Invalid message payload from Redis:", message);
+                }
             }
         });
     }
-
-        
-
     get io(): Server | null {
         return this._io;
     }
 }
 export default SocketService;
+// ...existing code...
