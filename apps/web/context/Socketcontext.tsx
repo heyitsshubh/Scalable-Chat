@@ -40,7 +40,7 @@ export const SocketProvider:React.FC<SocketProviderProps>=({children})=>{
     }, []);
 
     React.useEffect(() => {
-        const socket = io("http://localhost:3000");
+        const socket = io("http://localhost:5000");
         socket.on("event:message", onmessageReceived);
         setSocket(socket);
         return () => {

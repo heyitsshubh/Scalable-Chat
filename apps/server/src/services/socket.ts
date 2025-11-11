@@ -1,17 +1,13 @@
-// ...existing code...
+
 import { Server } from "socket.io";
 import Redis from "ioredis";
 
-// Use local Redis by default (no .env required). If you later want to override,
-// set process.env.REDIS_URL or process.env.SOCKET_PORT — but defaults work without an .env.
 const REDIS_HOST = "127.0.0.1";
 const REDIS_PORT = 6379;
-const SOCKET_PORT = 3000;
+const SOCKET_PORT = 5000;
 
 const pub = new Redis({ host: REDIS_HOST, port: REDIS_PORT });
 const sub = new Redis({ host: REDIS_HOST, port: REDIS_PORT });
-
-// prevent unhandled ioredis errors from crashing the process
 pub.on("error", (err) => console.error("[ioredis pub] error:", err));
 sub.on("error", (err) => console.error("[ioredis sub] error:", err));
 
@@ -25,18 +21,13 @@ class SocketService {
           origin: "*",
         },
       });
-
-      // start listening on a port different from Next.js (default 3000)
       try {
         this._io.listen(SOCKET_PORT);
         console.log(`Socket.io listening on port ${SOCKET_PORT}`);
       } catch (err) {
         console.error(`Failed to listen on port ${SOCKET_PORT}:`, err);
-        // rethrow so caller can handle; avoids leaving service in inconsistent state
         throw err;
       }
-
-      // subscribe to Redis channel; handle failures
       sub.subscribe("messages").then(() => {
         console.log("Subscribed to Redis 'messages' channel");
       }).catch((err) => {
@@ -80,4 +71,3 @@ class SocketService {
     }
 }
 export default SocketService;
-// ...existing code...
